@@ -42,6 +42,7 @@ func main() {
 				"status": "error",
 				"db":     "disconnected",
 			})
+			return
 		}
 
 		w.WriteHeader(http.StatusOK)
