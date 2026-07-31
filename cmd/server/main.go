@@ -10,6 +10,8 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/rizalta/file-drop/db"
+	"github.com/rizalta/file-drop/internal/repo"
 )
 
 func main() {
@@ -31,6 +33,14 @@ func main() {
 	if err != nil {
 		log.Fatalf("error connecting to db: %v", err)
 	}
+
+	if _, err := pool.Exec(ctx, db.SchemaSQL); err != nil {
+		log.Fatalf("failed to create tables: %v", err)
+	}
+
+	queries := repo.New(pool)
+
+	_ = queries
 
 	r := chi.NewRouter()
 
