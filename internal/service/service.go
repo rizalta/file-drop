@@ -28,12 +28,16 @@ type Storage interface {
 	Delete(storedName string) error
 }
 
+type Querier interface {
+	CreateDrop(ctx context.Context, arg repo.CreateDropParams) (repo.Drop, error)
+}
+
 type service struct {
-	queries *repo.Queries
+	queries Querier
 	storage Storage
 }
 
-func NewService(q *repo.Queries, s Storage) *service {
+func NewService(q Querier, s Storage) *service {
 	return &service{
 		queries: q,
 		storage: s,
@@ -84,7 +88,7 @@ func (s *service) CreateDrop(ctx context.Context, params CreateDropParams) (stri
 			IsText:            params.IsText,
 			TextContent:       pgtype.Text{String: params.TextContent, Valid: params.IsText},
 			BurnAfterDownload: params.BurnAfterDownload,
-			ExpiresAt:         time.Now().Add(expiresIn),
+			ExpiresAt:         time.Now().UTC().Add(expiresIn),
 		})
 
 		if err == nil {
