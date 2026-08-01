@@ -5,6 +5,8 @@
 package repo
 
 import (
+	"time"
+
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
@@ -18,6 +20,6 @@ type Drop struct {
 	TextContent       pgtype.Text
 	BurnAfterDownload bool
 	DownloadCount     int32
-	ExpiresAt         pgtype.Timestamptz
-	CreatedAt         pgtype.Timestamptz
+	ExpiresAt         time.Time
+	CreatedAt         time.Time
 }

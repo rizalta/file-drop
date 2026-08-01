@@ -7,6 +7,7 @@ package repo
 
 import (
 	"context"
+	"time"
 
 	"github.com/jackc/pgx/v5/pgtype"
 )
@@ -45,7 +46,7 @@ type CreateDropParams struct {
 	IsText            bool
 	TextContent       pgtype.Text
 	BurnAfterDownload bool
-	ExpiresAt         pgtype.Timestamptz
+	ExpiresAt         time.Time
 }
 
 func (q *Queries) CreateDrop(ctx context.Context, arg CreateDropParams) (Drop, error) {
