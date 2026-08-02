@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"os"
 	"time"
 
 	"github.com/google/uuid"
@@ -15,12 +16,17 @@ import (
 )
 
 const (
-	codeLen    = 5
+	idLen      = 5
 	maxRetries = 3
 	CHARSET    = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
 )
 
-var ErrMaxRetries = errors.New("max retries reached creating drop")
+var (
+	ErrDropNotFound  = errors.New("drop not found")
+	ErrInvalidExpiry = errors.New("invalid expiration duration")
+	ErrInvalidReader = errors.New("invalid file reader")
+	ErrMaxRetries    = errors.New("max retries reached creating drop")
+)
 
 type Storage interface {
 	Save(storedName string, r io.Reader) error
@@ -30,6 +36,11 @@ type Storage interface {
 
 type Querier interface {
 	CreateDrop(ctx context.Context, arg repo.CreateDropParams) (repo.Drop, error)
+	DeleteDrop(ctx context.Context, id string) (string, error)
+	DeleteExpiredDrops(ctx context.Context) ([]repo.DeleteExpiredDropsRow, error)
+	GetDropByID(ctx context.Context, id string) (repo.Drop, error)
+	IncrementDownloadCount(ctx context.Context, id string) error
+	ListActiveDrops(ctx context.Context) ([]repo.Drop, error)
 }
 
 type service struct {
@@ -58,29 +69,29 @@ type CreateDropParams struct {
 func (s *service) CreateDrop(ctx context.Context, params CreateDropParams) (string, error) {
 	expiresIn, err := parseExpiry(params.ExpiresIn)
 	if err != nil {
-		return "", fmt.Errorf("failed to parse expires in: %v", err)
+		return "", fmt.Errorf("%w: %v", ErrInvalidExpiry, err)
 	}
 
 	storedName := ""
 	if !params.IsText {
 		if params.Reader == nil {
-			return "", fmt.Errorf("invalid file reader")
+			return "", ErrInvalidReader
 		}
 
 		storedName = uuid.NewString()
 		if err := s.storage.Save(storedName, params.Reader); err != nil {
-			return "", fmt.Errorf("failed to save blob: %v", err)
+			return "", fmt.Errorf("failed to save blob: %w", err)
 		}
 	}
 
 	for range maxRetries {
-		code, err := generateCode()
+		id, err := generateID()
 		if err != nil {
 			continue
 		}
 
 		drop, err := s.queries.CreateDrop(ctx, repo.CreateDropParams{
-			ID:                code,
+			ID:                id,
 			Filename:          params.Filename,
 			FileSize:          int64(params.FileSize),
 			StoredName:        storedName,
@@ -97,7 +108,7 @@ func (s *service) CreateDrop(ctx context.Context, params CreateDropParams) (stri
 	}
 
 	if !params.IsText && storedName != "" {
-		if delErr := s.storage.Delete(storedName); delErr != nil {
+		if delErr := s.storage.Delete(storedName); delErr != nil && !errors.Is(delErr, os.ErrNotExist) {
 			log.Printf("failed blob cleanup of name: %s, %v", storedName, delErr)
 		}
 	}
@@ -105,14 +116,80 @@ func (s *service) CreateDrop(ctx context.Context, params CreateDropParams) (stri
 	return "", ErrMaxRetries
 }
 
-func generateCode() (string, error) {
-	b := make([]byte, codeLen)
+func (s *service) GetDrop(ctx context.Context, id string) (*repo.Drop, io.ReadCloser, error) {
+	drop, err := s.queries.GetDropByID(ctx, id)
+	if err != nil {
+		return nil, nil, fmt.Errorf("%w: %v", ErrDropNotFound, err)
+	}
+
+	var r io.ReadCloser
+	if !drop.IsText {
+		r, err = s.storage.Get(drop.StoredName)
+		if err != nil {
+			return nil, nil, fmt.Errorf("failed to get blob: %w", err)
+		}
+	}
+
+	if drop.BurnAfterDownload {
+		storedName, err := s.queries.DeleteDrop(ctx, id)
+		if err == nil && !drop.IsText && storedName != "" {
+			if err := s.storage.Delete(storedName); err != nil && !errors.Is(err, os.ErrNotExist) {
+				log.Printf("failed to delete blob %s: %v", storedName, err)
+			}
+		}
+	} else {
+		if err := s.queries.IncrementDownloadCount(ctx, id); err != nil {
+			log.Printf("failed to increment download count of %s: %v", id, err)
+		}
+	}
+
+	return &drop, r, nil
+}
+
+func (s *service) ListActiveDrops(ctx context.Context) ([]repo.Drop, error) {
+	return s.queries.ListActiveDrops(ctx)
+}
+
+func (s *service) DeleteDrop(ctx context.Context, id string) error {
+	storedName, err := s.queries.DeleteDrop(ctx, id)
+	if err != nil {
+		return fmt.Errorf("%w: %v", ErrDropNotFound, err)
+	}
+
+	if storedName != "" {
+		if err := s.storage.Delete(storedName); err != nil && !errors.Is(err, os.ErrNotExist) {
+			return fmt.Errorf("failed to delete stored blob: %w", err)
+		}
+	}
+
+	return nil
+}
+
+func (s *service) CleanupExpiredDrops(ctx context.Context) error {
+	drops, err := s.queries.DeleteExpiredDrops(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to delete expired drops from DB: %w", err)
+	}
+
+	for _, drop := range drops {
+		if drop.StoredName != "" {
+			if err := s.storage.Delete(drop.StoredName); err != nil && !errors.Is(err, os.ErrNotExist) {
+				log.Printf("failed to delete expired blob %s: %v", drop.StoredName, err)
+			}
+		}
+	}
+
+	return nil
+}
+
+func generateID() (string, error) {
+	b := make([]byte, idLen)
 
 	if _, err := rand.Read(b); err != nil {
 		return "", err
 	}
 
-	for i := range codeLen {
+	for i := range idLen {
 		b[i] = CHARSET[b[i]%byte(len(CHARSET))]
 	}
 
