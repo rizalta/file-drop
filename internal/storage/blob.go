@@ -30,6 +30,7 @@ func (f *fileStorage) Save(storedName string, r io.Reader) error {
 	}()
 
 	if _, err := io.Copy(dst, r); err != nil {
+		_ = os.Remove(filePath)
 		return fmt.Errorf("failed to write file: %w", err)
 	}
 
