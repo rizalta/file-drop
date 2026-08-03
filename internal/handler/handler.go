@@ -4,10 +4,15 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
+	"log"
 	"net/http"
+	"strconv"
 	"strings"
+	"time"
 
+	"github.com/go-chi/chi/v5"
 	"github.com/rizalta/file-drop/internal/repo"
 	"github.com/rizalta/file-drop/internal/service"
 )
@@ -20,19 +25,19 @@ type DropsService interface {
 	ListActiveDrops(ctx context.Context) ([]repo.Drop, error)
 }
 
-type dropsHandler struct {
+type handler struct {
 	dropsService DropsService
 }
 
-func NewHandler(s DropsService) *dropsHandler {
-	return &dropsHandler{s}
+func NewHandler(s DropsService) *handler {
+	return &handler{s}
 }
 
 type UploadDropRes struct {
 	ID string `json:"id"`
 }
 
-func (h *dropsHandler) UploadDrop(w http.ResponseWriter, r *http.Request) {
+func (h *handler) UploadDrop(w http.ResponseWriter, r *http.Request) {
 	if err := r.ParseMultipartForm(32 << 20); err != nil {
 		errResponse(w, "Failed to parse form", http.StatusBadRequest)
 		return
@@ -90,6 +95,78 @@ func (h *dropsHandler) UploadDrop(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
 	_ = json.NewEncoder(w).Encode(res)
+}
+
+type DownloadDropRes struct {
+	Filename      string    `json:"filename"`
+	FileSize      int       `json:"file_size"`
+	MimeType      string    `json:"mime_type"`
+	IsText        bool      `json:"is_text"`
+	TextContent   string    `json:"text_content"`
+	DownloadCount int       `json:"download_count"`
+	CreatedAt     time.Time `json:"created_at"`
+}
+
+func (h *handler) DownloadDrop(w http.ResponseWriter, r *http.Request) {
+	id := strings.TrimSpace(chi.URLParam(r, "id"))
+	if id == "" {
+		errResponse(w, "ID required", http.StatusBadRequest)
+		return
+	}
+
+	isDownload := r.URL.Query().Get("download") == "true"
+
+	drop, rc, err := h.dropsService.GetDrop(r.Context(), id)
+	if err != nil {
+		if errors.Is(err, service.ErrDropNotFound) {
+			errResponse(w, "Drop not found", http.StatusNotFound)
+			return
+		}
+		errResponse(w, "Internal Server Error", http.StatusInternalServerError)
+		return
+	}
+	if rc != nil {
+		defer func() {
+			_ = rc.Close()
+		}()
+	}
+
+	if isDownload {
+		if drop.IsText {
+			w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+			if _, err := w.Write([]byte(drop.TextContent.String)); err != nil {
+				log.Printf("failed to write text content of id: %s, %v", id, err)
+			}
+			return
+		}
+
+		if drop.MimeType == "" {
+			drop.MimeType = "application/octet-stream"
+		}
+
+		w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="%s"`, drop.Filename))
+		w.Header().Set("Content-Type", drop.MimeType)
+		w.Header().Set("Content-Length", strconv.FormatInt(drop.FileSize, 10))
+		if _, err := io.Copy(w, rc); err != nil {
+			log.Printf("Failed to download for file: %s, %v", id, err)
+		}
+		return
+	}
+
+	res := DownloadDropRes{
+		Filename:      drop.Filename,
+		FileSize:      int(drop.FileSize),
+		MimeType:      drop.MimeType,
+		IsText:        drop.IsText,
+		TextContent:   drop.TextContent.String,
+		DownloadCount: int(drop.DownloadCount),
+		CreatedAt:     drop.CreatedAt,
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	if err := json.NewEncoder(w).Encode(res); err != nil {
+		log.Printf("failed to encode response")
+	}
 }
 
 func errResponse(w http.ResponseWriter, msg string, status int) {
