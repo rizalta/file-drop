@@ -122,9 +122,9 @@ func (s *service) GetDrop(ctx context.Context, id string) (*repo.Drop, io.ReadCl
 		return nil, nil, fmt.Errorf("%w: %v", ErrDropNotFound, err)
 	}
 
-	var r io.ReadCloser
+	var rc io.ReadCloser
 	if !drop.IsText {
-		r, err = s.storage.Get(drop.StoredName)
+		rc, err = s.storage.Get(drop.StoredName)
 		if err != nil {
 			return nil, nil, fmt.Errorf("failed to get blob: %w", err)
 		}
@@ -143,7 +143,7 @@ func (s *service) GetDrop(ctx context.Context, id string) (*repo.Drop, io.ReadCl
 		}
 	}
 
-	return &drop, r, nil
+	return &drop, rc, nil
 }
 
 func (s *service) ListActiveDrops(ctx context.Context) ([]repo.Drop, error) {
