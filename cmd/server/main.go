@@ -16,6 +16,7 @@ import (
 	"github.com/rizalta/file-drop/internal/repo"
 	"github.com/rizalta/file-drop/internal/service"
 	"github.com/rizalta/file-drop/internal/storage"
+	"github.com/rizalta/file-drop/web"
 )
 
 func main() {
@@ -80,6 +81,9 @@ func main() {
 	r.Post("/api/upload", handler.UploadDrop)
 	r.Get("/f/{id}", handler.DownloadDrop)
 	r.Delete("/api/files/{id}", handler.DeleteDrop)
+	r.Get("/", func(w http.ResponseWriter, r *http.Request) {
+		http.ServeFileFS(w, r, web.Assets, "index.html")
+	})
 
 	go func() {
 		ticker := time.NewTicker(1 * time.Minute)

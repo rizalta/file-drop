@@ -238,7 +238,7 @@ func TestGetDrop(t *testing.T) {
 			t.Fatalf("setup failed: %v", err)
 		}
 
-		drop, rc, err := s.GetDrop(ctx, id)
+		drop, rc, err := s.GetDrop(ctx, id, true)
 		if err != nil {
 			t.Fatalf("expected GetDrop to succeed, got %v", err)
 		}
@@ -275,14 +275,14 @@ func TestGetDrop(t *testing.T) {
 			t.Fatalf("setup failed: %v", err)
 		}
 
-		drop, rc, err := s.GetDrop(ctx, id)
+		drop, rc, err := s.GetDrop(ctx, id, true)
 		if err != nil {
 			t.Fatalf("first GetDrop failed: %v", err)
 		}
 		_ = rc.Close()
 		_ = drop
 
-		_, _, err = s.GetDrop(ctx, id)
+		_, _, err = s.GetDrop(ctx, id, true)
 		if err == nil {
 			t.Errorf("expected 2nd GetDrop on burned file to fail, but succeeded")
 		}

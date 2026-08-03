@@ -21,7 +21,7 @@ type DropsService interface {
 	CleanupExpiredDrops(ctx context.Context) error
 	CreateDrop(ctx context.Context, params service.CreateDropParams) (string, error)
 	DeleteDrop(ctx context.Context, id string) error
-	GetDrop(ctx context.Context, id string) (*repo.Drop, io.ReadCloser, error)
+	GetDrop(ctx context.Context, id string, isDownload bool) (*repo.Drop, io.ReadCloser, error)
 	ListActiveDrops(ctx context.Context) ([]repo.Drop, error)
 }
 
@@ -116,7 +116,7 @@ func (h *handler) DownloadDrop(w http.ResponseWriter, r *http.Request) {
 
 	isDownload := r.URL.Query().Get("download") == "true"
 
-	drop, rc, err := h.dropsService.GetDrop(r.Context(), id)
+	drop, rc, err := h.dropsService.GetDrop(r.Context(), id, isDownload)
 	if err != nil {
 		if errors.Is(err, service.ErrDropNotFound) {
 			errResponse(w, "Drop not found", http.StatusNotFound)

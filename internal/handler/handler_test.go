@@ -69,7 +69,7 @@ func (m *mockService) DeleteDrop(ctx context.Context, id string) error {
 	return nil
 }
 
-func (m *mockService) GetDrop(ctx context.Context, id string) (*repo.Drop, io.ReadCloser, error) {
+func (m *mockService) GetDrop(ctx context.Context, id string, isDownload bool) (*repo.Drop, io.ReadCloser, error) {
 	drop, ok := m.db[id]
 	if !ok {
 		return nil, nil, service.ErrDropNotFound

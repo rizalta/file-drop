@@ -116,34 +116,36 @@ func (s *service) CreateDrop(ctx context.Context, params CreateDropParams) (stri
 	return "", ErrMaxRetries
 }
 
-func (s *service) GetDrop(ctx context.Context, id string) (*repo.Drop, io.ReadCloser, error) {
+func (s *service) GetDrop(ctx context.Context, id string, isDownload bool) (*repo.Drop, io.ReadCloser, error) {
 	drop, err := s.queries.GetDropByID(ctx, id)
 	if err != nil {
 		return nil, nil, fmt.Errorf("%w: %v", ErrDropNotFound, err)
 	}
 
-	var rc io.ReadCloser
-	if !drop.IsText {
-		rc, err = s.storage.Get(drop.StoredName)
+	var r io.ReadCloser
+	if !drop.IsText && isDownload {
+		r, err = s.storage.Get(drop.StoredName)
 		if err != nil {
 			return nil, nil, fmt.Errorf("failed to get blob: %w", err)
 		}
 	}
 
-	if drop.BurnAfterDownload {
-		storedName, err := s.queries.DeleteDrop(ctx, id)
-		if err == nil && !drop.IsText && storedName != "" {
-			if err := s.storage.Delete(storedName); err != nil && !errors.Is(err, os.ErrNotExist) {
-				log.Printf("failed to delete blob %s: %v", storedName, err)
+	if isDownload {
+		if drop.BurnAfterDownload {
+			storedName, err := s.queries.DeleteDrop(ctx, id)
+			if err == nil && !drop.IsText && storedName != "" {
+				if err := s.storage.Delete(storedName); err != nil && !errors.Is(err, os.ErrNotExist) {
+					log.Printf("failed to delete blob %s: %v", storedName, err)
+				}
 			}
-		}
-	} else {
-		if err := s.queries.IncrementDownloadCount(ctx, id); err != nil {
-			log.Printf("failed to increment download count of %s: %v", id, err)
+		} else {
+			if err := s.queries.IncrementDownloadCount(ctx, id); err != nil {
+				log.Printf("failed to increment download count of %s: %v", id, err)
+			}
 		}
 	}
 
-	return &drop, rc, nil
+	return &drop, r, nil
 }
 
 func (s *service) ListActiveDrops(ctx context.Context) ([]repo.Drop, error) {
