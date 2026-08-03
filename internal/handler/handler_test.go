@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/rizalta/file-drop/internal/repo"
@@ -54,11 +55,33 @@ func (m *mockService) CreateDrop(ctx context.Context, params service.CreateDropP
 	return id, nil
 }
 
-func (m *mockService) CleanupExpiredDrops(ctx context.Context) error   { return nil }
-func (m *mockService) DeleteDrop(ctx context.Context, id string) error { return nil }
-func (m *mockService) GetDrop(ctx context.Context, id string) (*repo.Drop, io.ReadCloser, error) {
-	return nil, nil, nil
+func (m *mockService) CleanupExpiredDrops(ctx context.Context) error { return nil }
+
+func (m *mockService) DeleteDrop(ctx context.Context, id string) error {
+	drop, ok := m.db[id]
+	if !ok {
+		return service.ErrDropNotFound
+	}
+	delete(m.db, id)
+	if drop.StoredName != "" {
+		delete(m.storage, drop.StoredName)
+	}
+	return nil
 }
+
+func (m *mockService) GetDrop(ctx context.Context, id string) (*repo.Drop, io.ReadCloser, error) {
+	drop, ok := m.db[id]
+	if !ok {
+		return nil, nil, service.ErrDropNotFound
+	}
+	var rc io.ReadCloser
+	if !drop.IsText && drop.StoredName != "" {
+		data := m.storage[drop.StoredName]
+		rc = io.NopCloser(bytes.NewReader(data))
+	}
+	return drop, rc, nil
+}
+
 func (m *mockService) ListActiveDrops(ctx context.Context) ([]repo.Drop, error) { return nil, nil }
 
 func TestUploadDrop(t *testing.T) {
@@ -149,6 +172,141 @@ func TestUploadDrop(t *testing.T) {
 
 		if rec.Code != 400 {
 			t.Errorf("expected status 400 but got %d", rec.Code)
+		}
+	})
+}
+
+func TestDownloadDrop(t *testing.T) {
+	ctx := context.Background()
+
+	t.Run("download raw file stream", func(t *testing.T) {
+		m := newMockService()
+		h := NewHandler(m)
+
+		fileContent := "binary file payload data"
+		_, _ = m.CreateDrop(ctx, service.CreateDropParams{
+			Filename: "file.txt",
+			FileSize: len(fileContent),
+			MimeType: "text/plain",
+			Reader:   bytes.NewBufferString(fileContent),
+		})
+
+		req := httptest.NewRequest("GET", "/f/test123?download=true", nil)
+		rctx := chi.NewRouteContext()
+		rctx.URLParams.Add("id", "test123")
+		req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rctx))
+
+		rec := httptest.NewRecorder()
+		h.DownloadDrop(rec, req)
+
+		if rec.Code != 200 {
+			t.Errorf("expected status 200, got %d", rec.Code)
+		}
+
+		if rec.Header().Get("Content-Disposition") != `attachment; filename="file.txt"` {
+			t.Errorf("unexpected Content-Disposition: %s", rec.Header().Get("Content-Disposition"))
+		}
+
+		if rec.Body.String() != fileContent {
+			t.Errorf("expected body %q, got %q", fileContent, rec.Body.String())
+		}
+	})
+
+	t.Run("download JSON preview", func(t *testing.T) {
+		m := newMockService()
+		h := NewHandler(m)
+
+		_, _ = m.CreateDrop(ctx, service.CreateDropParams{
+			Filename: "file.txt",
+			FileSize: 10,
+			MimeType: "text/plain",
+			Reader:   bytes.NewBufferString("1234567890"),
+		})
+
+		req := httptest.NewRequest("GET", "/f/test123", nil)
+		rctx := chi.NewRouteContext()
+		rctx.URLParams.Add("id", "test123")
+		req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rctx))
+
+		rec := httptest.NewRecorder()
+		h.DownloadDrop(rec, req)
+
+		if rec.Code != 200 {
+			t.Errorf("expected status 200, got %d", rec.Code)
+		}
+
+		var res DownloadDropRes
+		if err := json.Unmarshal(rec.Body.Bytes(), &res); err != nil {
+			t.Fatalf("failed to unmarshal JSON preview: %v", err)
+		}
+
+		if res.Filename != "file.txt" {
+			t.Errorf("expected filename file.txt, got %s", res.Filename)
+		}
+	})
+
+	t.Run("non existent drop returns 404", func(t *testing.T) {
+		m := newMockService()
+		h := NewHandler(m)
+
+		req := httptest.NewRequest("GET", "/f/missing", nil)
+		rctx := chi.NewRouteContext()
+		rctx.URLParams.Add("id", "missing")
+		req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rctx))
+
+		rec := httptest.NewRecorder()
+		h.DownloadDrop(rec, req)
+
+		if rec.Code != 404 {
+			t.Errorf("expected status 404, got %d", rec.Code)
+		}
+	})
+}
+
+func TestDeleteDrop(t *testing.T) {
+	ctx := context.Background()
+
+	t.Run("successful drop deletion", func(t *testing.T) {
+		m := newMockService()
+		h := NewHandler(m)
+
+		_, _ = m.CreateDrop(ctx, service.CreateDropParams{
+			Filename: "file.txt",
+			FileSize: 5,
+			Reader:   bytes.NewBufferString("hello"),
+		})
+
+		req := httptest.NewRequest("DELETE", "/api/v1/files/test123", nil)
+		rctx := chi.NewRouteContext()
+		rctx.URLParams.Add("id", "test123")
+		req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rctx))
+
+		rec := httptest.NewRecorder()
+		h.DeleteDrop(rec, req)
+
+		if rec.Code != 200 {
+			t.Errorf("expected status 200, got %d", rec.Code)
+		}
+
+		if len(m.db) != 0 {
+			t.Errorf("expected drop to be removed from mock DB")
+		}
+	})
+
+	t.Run("deleting non existent drop returns 404", func(t *testing.T) {
+		m := newMockService()
+		h := NewHandler(m)
+
+		req := httptest.NewRequest("DELETE", "/api/v1/files/missing", nil)
+		rctx := chi.NewRouteContext()
+		rctx.URLParams.Add("id", "missing")
+		req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rctx))
+
+		rec := httptest.NewRecorder()
+		h.DeleteDrop(rec, req)
+
+		if rec.Code != 404 {
+			t.Errorf("expected status 404, got %d", rec.Code)
 		}
 	})
 }
