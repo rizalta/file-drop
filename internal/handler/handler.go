@@ -122,7 +122,7 @@ func (h *handler) DownloadDrop(w http.ResponseWriter, r *http.Request) {
 			errResponse(w, "Drop not found", http.StatusNotFound)
 			return
 		}
-		errResponse(w, "Internal Server Error", http.StatusInternalServerError)
+		errResponse(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
 	if rc != nil {
@@ -167,6 +167,24 @@ func (h *handler) DownloadDrop(w http.ResponseWriter, r *http.Request) {
 	if err := json.NewEncoder(w).Encode(res); err != nil {
 		log.Printf("failed to encode response")
 	}
+}
+
+func (h *handler) DeleteDrop(w http.ResponseWriter, r *http.Request) {
+	id := strings.TrimSpace(chi.URLParam(r, "id"))
+	if id == "" {
+		errResponse(w, "ID is required", http.StatusBadRequest)
+		return
+	}
+
+	if err := h.dropsService.DeleteDrop(r.Context(), id); err != nil {
+		if errors.Is(err, service.ErrDropNotFound) {
+			errResponse(w, "Drop not found", http.StatusNotFound)
+			return
+		}
+		errResponse(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+	w.WriteHeader(http.StatusOK)
 }
 
 func errResponse(w http.ResponseWriter, msg string, status int) {
