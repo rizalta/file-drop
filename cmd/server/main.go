@@ -7,11 +7,15 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/rizalta/file-drop/db"
+	"github.com/rizalta/file-drop/internal/handler"
 	"github.com/rizalta/file-drop/internal/repo"
+	"github.com/rizalta/file-drop/internal/service"
+	"github.com/rizalta/file-drop/internal/storage"
 )
 
 func main() {
@@ -20,6 +24,11 @@ func main() {
 	serverPort := os.Getenv("PORT")
 	if serverPort == "" {
 		serverPort = "8080"
+	}
+
+	storagePath := os.Getenv("STORAGE_PATH")
+	if storagePath == "" {
+		storagePath = "./blobs"
 	}
 
 	dsn := fmt.Sprintf("postgres://%s:%s@%s:%s/%s?sslmode=disable",
@@ -37,10 +46,6 @@ func main() {
 	if _, err := pool.Exec(ctx, db.SchemaSQL); err != nil {
 		log.Fatalf("failed to create tables: %v", err)
 	}
-
-	queries := repo.New(pool)
-
-	_ = queries
 
 	r := chi.NewRouter()
 
@@ -61,6 +66,31 @@ func main() {
 			"db":     "connected",
 		})
 	})
+
+	querier := repo.New(pool)
+	storage, err := storage.NewFileStorage(storagePath)
+	if err != nil {
+		log.Fatalf("failed to initialize storage: %v", err)
+	}
+
+	service := service.NewService(querier, storage)
+
+	handler := handler.NewHandler(service)
+
+	r.Post("/api/upload", handler.UploadDrop)
+	r.Get("/f/{id}", handler.DownloadDrop)
+	r.Delete("/api/files/{id}", handler.DeleteDrop)
+
+	go func() {
+		ticker := time.NewTicker(1 * time.Minute)
+		defer ticker.Stop()
+
+		for range ticker.C {
+			if err := service.CleanupExpiredDrops(ctx); err != nil {
+				log.Printf("failed to cleanup drops: %v", err)
+			}
+		}
+	}()
 
 	fmt.Printf("Server is running on port: %s\n", serverPort)
 	if err := http.ListenAndServe(":"+serverPort, r); err != nil {

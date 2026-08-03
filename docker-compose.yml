@@ -30,6 +30,9 @@ services:
       DB_USER: postgres
       DB_PASSWORD: postgres
       DB_NAME: file_drop
+      STORAGE_PATH: /data/blobs
+    volumes:
+      - blobs_data:/data/blobs
     depends_on:
       postgres:
         condition: service_healthy
@@ -37,3 +40,4 @@ services:
 
 volumes:
   postgres_data:
+  blobs_data:
