@@ -82,7 +82,7 @@ func main() {
 	r.Get("/f/{id}", handler.DownloadDrop)
 	r.Delete("/api/files/{id}", handler.DeleteDrop)
 	r.Get("/", func(w http.ResponseWriter, r *http.Request) {
-		http.ServeFileFS(w, r, web.Assets, "index.html")
+		http.ServeFileFS(w, r, web.WebUI, "index.html")
 	})
 
 	go func() {

@@ -1,52 +1,13 @@
-<!DOCTYPE html>
-<html>
-<head>
-  <title>Filedrop Test</title>
-</head>
-<body>
-  <h2>Filedrop</h2>
-
-  <form id="uploadForm">
-    <p>
-      File: <input type="file" name="file" />
-    </p>
-    <p>
-      Text: <textarea name="content"></textarea>
-    </p>
-    <p>
-      Expires:
-      <select name="expires_in">
-        <option value="10m">10m</option>
-        <option value="1h" selected>1h</option>
-        <option value="24h">24h</option>
-        <option value="7d">7d</option>
-      </select>
-    </p>
-    <p>
-      <input type="checkbox" name="burn_after_download" value="true" /> Burn after download
-    </p>
-    <button type="submit">Upload</button>
-  </form>
-
-  <div id="result" style="display:none;">
-    <p>Link: <a id="shareLink" href="" target="_blank"></a></p>
-  </div>
-
-  <script>
-    document.getElementById('uploadForm').addEventListener('submit', async (e) => {
-      e.preventDefault();
-      const res = await fetch('/api/upload', { method: 'POST', body: new FormData(e.target) });
-      const data = await res.json();
-      if (res.ok) {
-        const url = window.location.origin + '/f/' + data.id;
-        const link = document.getElementById('shareLink');
-        link.href = url;
-        link.textContent = url;
-        document.getElementById('result').style.display = 'block';
-      } else {
-        alert(data.error || 'error');
-      }
-    });
-  </script>
-</body>
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>web</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
 </html>

@@ -2,5 +2,5 @@ package web
 
 import "embed"
 
-//go:embed index.html
-var Assets embed.FS
+//go:embed "all:dist"
+var WebUI embed.FS
