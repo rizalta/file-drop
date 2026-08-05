@@ -1,6 +1,13 @@
 package web
 
-import "embed"
+import (
+	"embed"
+	"io/fs"
+)
 
 //go:embed "all:dist"
-var WebUI embed.FS
+var files embed.FS
+
+func WebUI() (fs.FS, error) {
+	return fs.Sub(files, "dist")
+}

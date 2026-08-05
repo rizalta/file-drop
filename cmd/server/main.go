@@ -81,9 +81,13 @@ func main() {
 	r.Post("/api/upload", handler.UploadDrop)
 	r.Get("/f/{id}", handler.DownloadDrop)
 	r.Delete("/api/files/{id}", handler.DeleteDrop)
-	r.Get("/", func(w http.ResponseWriter, r *http.Request) {
-		http.ServeFileFS(w, r, web.WebUI, "index.html")
-	})
+
+	webUI, err := web.WebUI()
+	if err != nil {
+		log.Fatalf("failed to embed web ui: %v", err)
+	}
+
+	r.Handle("/*", http.FileServerFS(webUI))
 
 	go func() {
 		ticker := time.NewTicker(1 * time.Minute)
