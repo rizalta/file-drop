@@ -6,12 +6,12 @@ import (
 	"fmt"
 	"log"
 	"net/http"
-	"os"
 	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/rizalta/file-drop/db"
+	"github.com/rizalta/file-drop/internal/config"
 	"github.com/rizalta/file-drop/internal/handler"
 	"github.com/rizalta/file-drop/internal/repo"
 	"github.com/rizalta/file-drop/internal/service"
@@ -21,23 +21,15 @@ import (
 
 func main() {
 	ctx := context.Background()
-
-	serverPort := os.Getenv("PORT")
-	if serverPort == "" {
-		serverPort = "8080"
-	}
-
-	storagePath := os.Getenv("STORAGE_PATH")
-	if storagePath == "" {
-		storagePath = "./blobs"
-	}
+	config := config.Load()
 
 	dsn := fmt.Sprintf("postgres://%s:%s@%s:%s/%s?sslmode=disable",
-		os.Getenv("DB_USER"),
-		os.Getenv("DB_PASSWORD"),
-		os.Getenv("DB_HOST"),
-		os.Getenv("DB_PORT"),
-		os.Getenv("DB_NAME"))
+		config.DBUser,
+		config.DBPassword,
+		config.DBHost,
+		config.DBPort,
+		config.DBName,
+	)
 
 	pool, err := pgxpool.New(ctx, dsn)
 	if err != nil {
@@ -69,7 +61,7 @@ func main() {
 	})
 
 	querier := repo.New(pool)
-	storage, err := storage.NewFileStorage(storagePath)
+	storage, err := storage.NewFileStorage(config.StoragePath)
 	if err != nil {
 		log.Fatalf("failed to initialize storage: %v", err)
 	}
@@ -100,8 +92,8 @@ func main() {
 		}
 	}()
 
-	fmt.Printf("Server is running on port: %s\n", serverPort)
-	if err := http.ListenAndServe(":"+serverPort, r); err != nil {
-		log.Fatalf("failed to Listen to %s: %v", serverPort, err)
+	fmt.Printf("Server is running on port: %s\n", config.ServerPort)
+	if err := http.ListenAndServe(":"+config.ServerPort, r); err != nil {
+		log.Fatalf("failed to Listen to %s: %v", config.ServerPort, err)
 	}
 }
