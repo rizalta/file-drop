@@ -66,7 +66,7 @@ const UploadCard = () => {
     }
   };
 
-  const handleUpload = async (e: React.FormEvent) => {
+  const handleUpload = async (e: React.SubmitEvent) => {
     e.preventDefault();
     setError("");
 
