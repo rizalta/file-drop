@@ -71,8 +71,8 @@ func main() {
 	handler := handler.NewHandler(service)
 
 	r.Post("/api/upload", handler.UploadDrop)
-	r.Get("/f/{id}", handler.DownloadDrop)
-	r.Delete("/api/files/{id}", handler.DeleteDrop)
+	r.Get("/api/f/{id}", handler.DownloadDrop)
+	r.Delete("/api/f/{id}", handler.DeleteDrop)
 
 	webUI, err := web.WebUI()
 	if err != nil {
