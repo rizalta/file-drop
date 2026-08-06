@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/go-chi/chi/v5/middleware"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/rizalta/file-drop/db"
 	"github.com/rizalta/file-drop/internal/config"
@@ -41,6 +42,12 @@ func main() {
 	}
 
 	r := chi.NewRouter()
+	spaHandler, err := web.SPAHandler()
+	if err != nil {
+		log.Fatalf("failed to initialize static handler")
+	}
+
+	r.Use(middleware.Logger)
 
 	r.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
@@ -74,12 +81,7 @@ func main() {
 	r.Get("/api/f/{id}", handler.DownloadDrop)
 	r.Delete("/api/f/{id}", handler.DeleteDrop)
 
-	webUI, err := web.WebUI()
-	if err != nil {
-		log.Fatalf("failed to embed web ui: %v", err)
-	}
-
-	r.Handle("/*", http.FileServerFS(webUI))
+	r.Handle("/*", spaHandler)
 
 	go func() {
 		ticker := time.NewTicker(1 * time.Minute)
