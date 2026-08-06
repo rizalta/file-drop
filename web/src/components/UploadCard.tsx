@@ -12,7 +12,11 @@ import {
 } from "./ui/select";
 import { getFileIcon } from "../lib/file-icon";
 
-const UploadCard = () => {
+interface UploadCardProps {
+  onSuccess?: (id: string) => void;
+}
+
+const UploadCard = ({ onSuccess }: UploadCardProps) => {
   const [activeTab, setActiveTab] = useState<"file" | "text">("file");
   const [file, setFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
@@ -66,7 +70,7 @@ const UploadCard = () => {
     }
   };
 
-  const handleUpload = async (e: React.SubmitEvent) => {
+  const handleUpload = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
 
@@ -110,7 +114,7 @@ const UploadCard = () => {
         return;
       }
 
-      console.log("Uploaded successfully:", data);
+      onSuccess?.(data.id);
     } catch (err) {
       setError("Something went wrong. Please check connection.");
     } finally {
