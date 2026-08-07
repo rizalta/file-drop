@@ -14,7 +14,7 @@ type Config struct {
 
 func Load() *Config {
 	return &Config{
-		ServerPort:  getEnv("PORT", "8080"),
+		ServerPort:  getEnv("PORT", "8000"),
 		StoragePath: getEnv("STORAGE_PATH", "./blobs"),
 		DBUser:      getEnv("DB_USER", "postgres"),
 		DBPassword:  getEnv("DB_PASSWORD", "postgres"),
