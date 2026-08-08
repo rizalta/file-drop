@@ -78,7 +78,7 @@ func main() {
 	handler := handler.NewHandler(service)
 
 	r.Post("/api/upload", handler.UploadDrop)
-	r.Get("/api/f/{id}", handler.DownloadDrop)
+	r.Get("/api/f/{id}", handler.GetDrop)
 	r.Delete("/api/f/{id}", handler.DeleteDrop)
 
 	r.Handle("/*", spaHandler)

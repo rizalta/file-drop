@@ -211,7 +211,7 @@ const UploadCard = ({ onSuccess }: UploadCardProps) => {
           <textarea
             name="content"
             placeholder="Paste text notes, copied links, or code snippets here..."
-            className="w-full h-32 p-4 text-xs font-mono bg-background border border-border/80 rounded-none text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-1 focus:ring-ring resize-none"
+            className="w-full h-36 p-4 text-xs font-mono bg-background border border-border/80 rounded-none text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-1 focus:ring-ring resize-none"
             value={content}
             onChange={(e) => setContent(e.target.value)}
           />

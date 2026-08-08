@@ -197,7 +197,7 @@ func TestDownloadDrop(t *testing.T) {
 		req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rctx))
 
 		rec := httptest.NewRecorder()
-		h.DownloadDrop(rec, req)
+		h.GetDrop(rec, req)
 
 		if rec.Code != 200 {
 			t.Errorf("expected status 200, got %d", rec.Code)
@@ -229,7 +229,7 @@ func TestDownloadDrop(t *testing.T) {
 		req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rctx))
 
 		rec := httptest.NewRecorder()
-		h.DownloadDrop(rec, req)
+		h.GetDrop(rec, req)
 
 		if rec.Code != 200 {
 			t.Errorf("expected status 200, got %d", rec.Code)
@@ -255,7 +255,7 @@ func TestDownloadDrop(t *testing.T) {
 		req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rctx))
 
 		rec := httptest.NewRecorder()
-		h.DownloadDrop(rec, req)
+		h.GetDrop(rec, req)
 
 		if rec.Code != 404 {
 			t.Errorf("expected status 404, got %d", rec.Code)

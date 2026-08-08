@@ -29,11 +29,15 @@ const App = () => {
     <main className="min-h-screen w-full flex flex-col p-4 justify-center items-center sm:p-6 lg:p-8 bg-background text-foreground">
       <div className="w-full max-w-xl flex flex-col items-center space-y-6">
         <header className="flex flex-col items-center text-center">
-          <div className="flex items-center gap-3">
-            <img src="/logo.svg" alt="File Drop Logo" className="w-10 h-10" />
-            <h1 className="text-3xl font-extrabold tracking-tight">File Dropz</h1>
-          </div>
-          <p className="text-sm text-muted-foreground">Drop Your Filez...</p>
+          <button
+            type="button"
+            onClick={() => navigateTo("/")}
+            className="flex items-center gap-3 cursor-pointer hover:opacity-85 transition-opacity group focus:outline-none"
+          >
+            <img src="/logo.svg" alt="File Drop Logo" className="w-10 h-10 group-hover:scale-105 transition-transform" />
+            <h1 className="text-3xl font-extrabold tracking-tight">File Drop</h1>
+          </button>
+          <p className="text-sm text-muted-foreground mt-1">Drop Your Files...</p>
         </header>
 
         {dropId ? (

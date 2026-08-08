@@ -102,12 +102,11 @@ type DownloadDropRes struct {
 	FileSize      int       `json:"file_size"`
 	MimeType      string    `json:"mime_type"`
 	IsText        bool      `json:"is_text"`
-	TextContent   string    `json:"text_content"`
 	DownloadCount int       `json:"download_count"`
 	CreatedAt     time.Time `json:"created_at"`
 }
 
-func (h *handler) DownloadDrop(w http.ResponseWriter, r *http.Request) {
+func (h *handler) GetDrop(w http.ResponseWriter, r *http.Request) {
 	id := strings.TrimSpace(chi.URLParam(r, "id"))
 	if id == "" {
 		errResponse(w, "ID required", http.StatusBadRequest)
@@ -158,7 +157,6 @@ func (h *handler) DownloadDrop(w http.ResponseWriter, r *http.Request) {
 		FileSize:      int(drop.FileSize),
 		MimeType:      drop.MimeType,
 		IsText:        drop.IsText,
-		TextContent:   drop.TextContent.String,
 		DownloadCount: int(drop.DownloadCount),
 		CreatedAt:     drop.CreatedAt,
 	}

@@ -8,7 +8,7 @@ interface DropMetadata {
   file_size: number;
   mime_type: string;
   is_text: boolean;
-  text_content: string;
+  text_content?: string;
   download_count: number;
   created_at: string;
 }
@@ -23,7 +23,11 @@ const DropCard = ({ id, mode = "download", onReset }: DropCardProps) => {
   const [data, setData] = useState<DropMetadata | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [copied, setCopied] = useState(false);
+  const [copiedLink, setCopiedLink] = useState(false);
+
+  const [revealedText, setRevealedText] = useState<string | null>(null);
+  const [revealing, setRevealing] = useState(false);
+  const [copiedText, setCopiedText] = useState(false);
 
   const dropUrl = `${window.location.origin}/f/${id}`;
 
@@ -55,15 +59,40 @@ const DropCard = ({ id, mode = "download", onReset }: DropCardProps) => {
     }
   }, [id]);
 
-  const handleCopy = () => {
+  const handleCopyLink = () => {
     navigator.clipboard.writeText(dropUrl);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+    setCopiedLink(true);
+    setTimeout(() => setCopiedLink(false), 2000);
   };
 
-  const handleDownload = () => {
-    // Triggers direct stream download & self-destruct on backend
+  const handleDownloadFile = () => {
     window.location.href = `/api/f/${id}?download=true`;
+  };
+
+  const handleRevealText = async () => {
+    if (revealedText) {
+      navigator.clipboard.writeText(revealedText);
+      setCopiedText(true);
+      setTimeout(() => setCopiedText(false), 2000);
+      return;
+    }
+
+    setRevealing(true);
+    try {
+      const res = await fetch(`/api/f/${id}?download=true`);
+      if (!res.ok) {
+        throw new Error("Failed to reveal text snippet.");
+      }
+      const text = await res.text();
+      setRevealedText(text);
+      navigator.clipboard.writeText(text);
+      setCopiedText(true);
+      setTimeout(() => setCopiedText(false), 2000);
+    } catch (err: any) {
+      setError(err.message || "Failed to reveal text snippet.");
+    } finally {
+      setRevealing(false);
+    }
   };
 
   if (loading) {
@@ -102,12 +131,11 @@ const DropCard = ({ id, mode = "download", onReset }: DropCardProps) => {
 
   return (
     <div className="w-full max-w-xl p-6 bg-card border border-border rounded-none shadow-sm space-y-6">
-      {/* Header Status Bar */}
       <div className="flex items-center justify-between border-b border-border/60 pb-3">
         <div className="flex items-center gap-2">
           <span className="h-2 w-2 bg-primary rounded-full animate-pulse" />
           <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-            {mode === "share" ? "Filedrop Created" : "Ready to Download"}
+            {mode === "share" ? "Filedrop Created" : "Ready to Access"}
           </span>
         </div>
 
@@ -116,7 +144,6 @@ const DropCard = ({ id, mode = "download", onReset }: DropCardProps) => {
         </div>
       </div>
 
-      {/* Content Preview Box */}
       {!data.is_text ? (
         <div className="flex items-center h-36 w-full border border-border bg-muted/10 overflow-hidden">
           <div className="w-1/4 h-full bg-muted/20 border-r border-border flex items-center justify-center text-foreground shrink-0">
@@ -132,12 +159,18 @@ const DropCard = ({ id, mode = "download", onReset }: DropCardProps) => {
           </div>
         </div>
       ) : (
-        <div className="w-full h-36 p-4 text-xs font-mono bg-background border border-border/80 rounded-none text-foreground overflow-y-auto whitespace-pre-wrap">
-          {data.text_content}
+        <div className="w-full h-36 p-4 text-xs font-mono bg-background border border-border/80 rounded-none text-foreground overflow-y-auto whitespace-pre-wrap flex flex-col justify-center items-center text-center">
+          {revealedText !== null ? (
+            <p className="text-left w-full h-full font-mono text-xs">{revealedText}</p>
+          ) : (
+            <div className="space-y-1.5 text-muted-foreground">
+              <p className="font-semibold text-foreground text-xs uppercase tracking-wider">🔒 Protected Text Snippet</p>
+              <p className="text-[11px]">Click reveal below to access and copy text content.</p>
+            </div>
+          )}
         </div>
       )}
 
-      {/* Mode 1: Share Link Bar (Uploader View) */}
       {mode === "share" ? (
         <div className="space-y-4">
           <div className="space-y-1.5">
@@ -152,10 +185,10 @@ const DropCard = ({ id, mode = "download", onReset }: DropCardProps) => {
               />
               <Button
                 type="button"
-                onClick={handleCopy}
+                onClick={handleCopyLink}
                 className="rounded-none uppercase text-xs font-bold tracking-wider h-10 px-5 shrink-0"
               >
-                {copied ? "Copied!" : "Copy"}
+                {copiedLink ? "Copied!" : "Copy"}
               </Button>
             </div>
           </div>
@@ -172,15 +205,31 @@ const DropCard = ({ id, mode = "download", onReset }: DropCardProps) => {
           )}
         </div>
       ) : (
-        /* Mode 2: Download CTA (Recipient View) */
         <div className="space-y-3">
-          <Button
-            type="button"
-            onClick={handleDownload}
-            className="w-full rounded-none uppercase text-xs font-bold tracking-wider h-10"
-          >
-            Download File
-          </Button>
+          {data.is_text ? (
+            <Button
+              type="button"
+              disabled={revealing}
+              onClick={handleRevealText}
+              className="w-full rounded-none uppercase text-xs font-bold tracking-wider h-10 disabled:opacity-50"
+            >
+              {revealing
+                ? "Revealing Text..."
+                : copiedText
+                ? "Copied to Clipboard!"
+                : revealedText !== null
+                ? "Copy Text to Clipboard"
+                : "Reveal & Copy Text"}
+            </Button>
+          ) : (
+            <Button
+              type="button"
+              onClick={handleDownloadFile}
+              className="w-full rounded-none uppercase text-xs font-bold tracking-wider h-10"
+            >
+              Download File
+            </Button>
+          )}
         </div>
       )}
     </div>
