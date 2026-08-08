@@ -406,3 +406,30 @@ func TestCleanupExpiredDrops(t *testing.T) {
 		}
 	})
 }
+
+func TestParseExpiry(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected time.Duration
+		wantErr  bool
+	}{
+		{"7d", 7 * 24 * time.Hour, false},
+		{"3d", 3 * 24 * time.Hour, false},
+		{"1d", 24 * time.Hour, false},
+		{"10m", 10 * time.Minute, false},
+		{"1h", time.Hour, false},
+		{"", 0, true},
+		{"invalid", 0, true},
+	}
+
+	for _, tt := range tests {
+		got, err := parseExpiry(tt.input)
+		if (err != nil) != tt.wantErr {
+			t.Errorf("parseExpiry(%q) error = %v, wantErr %v", tt.input, err, tt.wantErr)
+			continue
+		}
+		if got != tt.expected {
+			t.Errorf("parseExpiry(%q) = %v, want %v", tt.input, got, tt.expected)
+		}
+	}
+}

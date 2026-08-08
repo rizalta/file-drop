@@ -8,6 +8,8 @@ import (
 	"io"
 	"log"
 	"os"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -199,21 +201,14 @@ func generateID() (string, error) {
 }
 
 func parseExpiry(expiresIn string) (time.Duration, error) {
-	var ret time.Duration
-	switch expiresIn {
-	case "7d", "":
-		ret = 7 * 24 * time.Hour
-	case "3d":
-		ret = 3 * 24 * time.Hour
-	case "1d":
-		ret = 24 * time.Hour
-	default:
-		var err error
-		ret, err = time.ParseDuration(expiresIn)
+	expiresIn = strings.TrimSpace(strings.ToLower(expiresIn))
+	if strings.HasSuffix(expiresIn, "d") {
+		days, err := strconv.Atoi(expiresIn[:len(expiresIn)-1])
 		if err != nil {
 			return 0, err
 		}
+		return time.Duration(days) * 24 * time.Hour, nil
 	}
 
-	return ret, nil
+	return time.ParseDuration(expiresIn)
 }

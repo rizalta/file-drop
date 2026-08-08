@@ -83,8 +83,11 @@ func (h *handler) UploadDrop(w http.ResponseWriter, r *http.Request) {
 
 	id, err := h.dropsService.CreateDrop(r.Context(), params)
 	if err != nil {
-		if errors.Is(err, service.ErrInvalidExpiry) || errors.Is(err, service.ErrInvalidReader) {
-			errResponse(w, err.Error(), http.StatusBadRequest)
+		if errors.Is(err, service.ErrInvalidExpiry) {
+			errResponse(w, "Invalid Expiry", http.StatusBadRequest)
+			return
+		} else if errors.Is(err, service.ErrInvalidReader) {
+			errResponse(w, "Invalid file", http.StatusBadRequest)
 			return
 		}
 		errResponse(w, "Failed to upload drop", http.StatusInternalServerError)
