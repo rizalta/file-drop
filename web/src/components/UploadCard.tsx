@@ -11,6 +11,7 @@ import {
   SelectValue,
 } from "./ui/select";
 import { getFileIcon } from "../lib/file-icon";
+import { toast } from "./ui/toast";
 
 interface UploadCardProps {
   onSuccess?: (id: string) => void;
@@ -26,7 +27,6 @@ const UploadCard = ({ onSuccess }: UploadCardProps) => {
   const [customExpiresIn, setCustomExpiresIn] = useState("");
   const [content, setContent] = useState("");
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
   const [isDragging, setIsDragging] = useState(false);
 
   useEffect(() => {
@@ -70,20 +70,47 @@ const UploadCard = ({ onSuccess }: UploadCardProps) => {
     }
   };
 
-  const handleUpload = async (e: React.FormEvent) => {
+  const handleUpload = async (e: React.SubmitEvent) => {
     e.preventDefault();
-    setError("");
+
+    const xhr = new XMLHttpRequest()
+    xhr.open("POST", "/api/upload")
+
+    xhr.onprogress = (e) => {
+      const progress = Math.floor(e.loaded / e.total * 100)
+
+      console.log(progress)
+    }
+
+    xhr.onload = () => {
+      if (xhr.status >= 200 && xhr.status <= 300) {
+        console.log(100)
+      }
+    }
+
 
     if (activeTab === "file" && !file) {
-      setError("Please select a file to drop.");
+      toast.add({
+        title: "File Required",
+        description: "Please select a file to drop.",
+        type: "warning",
+      });
       return;
     }
     if (activeTab === "text" && !content.trim()) {
-      setError("Please enter text content to drop.");
+      toast.add({
+        title: "Text Required",
+        description: "Please enter text content to drop.",
+        type: "warning",
+      });
       return;
     }
     if (isCustomExpiry && !customExpiresIn.trim()) {
-      setError("Please enter a custom expiration duration (e.g. 30m, 3d).");
+      toast.add({
+        title: "Custom Expiry Required",
+        description: "Please enter a custom expiration duration (e.g. 30m, 3d).",
+        type: "warning",
+      });
       return;
     }
 
@@ -110,13 +137,26 @@ const UploadCard = ({ onSuccess }: UploadCardProps) => {
       const data = await res.json();
 
       if (!res.ok) {
-        setError(data.error || "Upload failed");
+        toast.add({
+          title: "Upload Failed",
+          description: data.error || "Failed to create drop.",
+          type: "error",
+        });
         return;
       }
 
+      toast.add({
+        title: "Filedrop Created",
+        description: "Your drop has been created successfully!",
+        type: "success",
+      });
       onSuccess?.(data.id);
     } catch (err) {
-      setError("Something went wrong. Please check connection.");
+      toast.add({
+        title: "Network Error",
+        description: "Something went wrong. Please check connection.",
+        type: "error",
+      });
     } finally {
       setLoading(false);
     }
@@ -286,19 +326,6 @@ const UploadCard = ({ onSuccess }: UploadCardProps) => {
           </label>
         </div>
       </div>
-
-      {error && (
-        <div className="p-3 bg-destructive/10 border border-destructive/30 text-destructive text-xs font-mono flex items-center justify-between">
-          <span>⚠️ {error}</span>
-          <button
-            type="button"
-            onClick={() => setError("")}
-            className="ml-2 text-destructive hover:opacity-75 cursor-pointer font-bold"
-          >
-            ✕
-          </button>
-        </div>
-      )}
 
       <Button
         type="submit"

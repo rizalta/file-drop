@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import UploadCard from "./components/UploadCard";
 import DropCard from "./components/DropCard";
+import { Toaster } from "./components/ui/toast";
 
 const App = () => {
   const [currentPath, setCurrentPath] = useState(window.location.pathname);
@@ -27,6 +28,7 @@ const App = () => {
 
   return (
     <main className="min-h-screen w-full flex flex-col p-4 justify-center items-center sm:p-6 lg:p-8 bg-background text-foreground">
+      <Toaster />
       <div className="w-full max-w-xl flex flex-col items-center space-y-6">
         <header className="flex flex-col items-center text-center">
           <button
