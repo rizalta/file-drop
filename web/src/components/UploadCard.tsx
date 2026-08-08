@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { Tabs, TabsList, TabsContent, TabsTrigger } from "./ui/tabs";
 import { Button } from "./ui/button";
 import { Checkbox } from "./ui/checkbox";
@@ -30,6 +30,8 @@ const UploadCard = ({ onSuccess }: UploadCardProps) => {
   const [loading, setLoading] = useState(false);
   const [progress, setProgress] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
+
+  const xhrRef = useRef<XMLHttpRequest | null>(null);
 
   useEffect(() => {
     if (file && file.type.startsWith("image/")) {
@@ -69,6 +71,15 @@ const UploadCard = ({ onSuccess }: UploadCardProps) => {
       setTimeout(() => {
         setFile(droppedFile);
       }, 0);
+    }
+  };
+
+  const handleCancelUpload = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (xhrRef.current) {
+      xhrRef.current.abort();
+      xhrRef.current = null;
     }
   };
 
@@ -118,6 +129,7 @@ const UploadCard = ({ onSuccess }: UploadCardProps) => {
     try {
       const data = await new Promise<{ id: string }>((resolve, reject) => {
         const xhr = new XMLHttpRequest();
+        xhrRef.current = xhr;
 
         xhr.upload.onprogress = (event) => {
           if (event.lengthComputable && event.total > 0) {
@@ -144,6 +156,10 @@ const UploadCard = ({ onSuccess }: UploadCardProps) => {
           }
         };
 
+        xhr.onabort = () => {
+          reject(new Error("UPLOAD_CANCELLED"));
+        };
+
         xhr.onerror = () => reject(new Error("Something went wrong. Please check connection."));
 
         xhr.open("POST", "/api/upload");
@@ -157,12 +173,21 @@ const UploadCard = ({ onSuccess }: UploadCardProps) => {
       });
       onSuccess?.(data.id);
     } catch (err: any) {
-      toast.add({
-        title: "Upload Error",
-        description: err.message || "Failed to create drop.",
-        type: "error",
-      });
+      if (err.message === "UPLOAD_CANCELLED") {
+        toast.add({
+          title: "Upload Cancelled",
+          description: "The upload process was cancelled.",
+          type: "info",
+        });
+      } else {
+        toast.add({
+          title: "Upload Error",
+          description: err.message || "Failed to create drop.",
+          type: "error",
+        });
+      }
     } finally {
+      xhrRef.current = null;
       setLoading(false);
     }
   };
@@ -339,17 +364,20 @@ const UploadCard = ({ onSuccess }: UploadCardProps) => {
       )}
 
       <Button
-        type="submit"
-        disabled={loading}
-        className="w-full rounded-none uppercase text-xs font-bold tracking-wider h-10 disabled:opacity-50"
+        type={loading ? "button" : "submit"}
+        onClick={loading ? handleCancelUpload : undefined}
+        variant={loading ? "outline" : "default"}
+        className={`w-full rounded-none uppercase text-xs font-bold tracking-wider h-10 transition-colors ${
+          loading ? "border-destructive/40 text-destructive hover:bg-destructive/10 hover:border-destructive" : ""
+        }`}
       >
         {loading ? (
-          <span className="flex items-center gap-2">
-            <svg className="animate-spin h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+          <span className="flex items-center justify-center gap-2">
+            <svg className="animate-spin h-3.5 w-3.5 text-destructive" viewBox="0 0 24 24" fill="none" stroke="currentColor">
               <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
               <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
             </svg>
-            Creating Filedrop...
+            Cancel Upload
           </span>
         ) : (
           "Create Filedrop"

@@ -181,7 +181,7 @@ const DropCard = ({ id, mode = "download", onReset }: DropCardProps) => {
               <Input
                 readOnly
                 value={dropUrl}
-                className="rounded-none text-xs font-mono h-10 bg-background border-border"
+                className="rounded-none text-xs font-mono h-10 px-3 bg-background border-border"
               />
               <Button
                 type="button"
