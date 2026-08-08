@@ -29,9 +29,12 @@ const UploadCard = ({ onSuccess }: UploadCardProps) => {
   const [content, setContent] = useState("");
   const [loading, setLoading] = useState(false);
   const [progress, setProgress] = useState(0);
+  const [speed, setSpeed] = useState("");
   const [isDragging, setIsDragging] = useState(false);
 
   const xhrRef = useRef<XMLHttpRequest | null>(null);
+  const lastTimeRef = useRef<number>(0);
+  const lastLoadedRef = useRef<number>(0);
 
   useEffect(() => {
     if (file && file.type.startsWith("image/")) {
@@ -113,6 +116,9 @@ const UploadCard = ({ onSuccess }: UploadCardProps) => {
 
     setLoading(true);
     setProgress(0);
+    setSpeed("");
+    lastTimeRef.current = 0;
+    lastLoadedRef.current = 0;
 
     const formData = new FormData();
     const finalExpiresIn = isCustomExpiry ? customExpiresIn.trim() : expiresIn;
@@ -135,6 +141,28 @@ const UploadCard = ({ onSuccess }: UploadCardProps) => {
           if (event.lengthComputable && event.total > 0) {
             const pct = Math.round((event.loaded / event.total) * 100);
             setProgress(pct);
+
+            const now = performance.now();
+            if (lastTimeRef.current > 0) {
+              const timeDiff = (now - lastTimeRef.current) / 1000;
+              const bytesDiff = event.loaded - lastLoadedRef.current;
+
+              if (timeDiff >= 0.2) {
+                const bps = bytesDiff / timeDiff;
+                if (bps >= 1024 * 1024) {
+                  setSpeed(`${(bps / (1024 * 1024)).toFixed(1)} MB/s`);
+                } else if (bps >= 1024) {
+                  setSpeed(`${(bps / 1024).toFixed(0)} KB/s`);
+                } else {
+                  setSpeed(`${bps.toFixed(0)} B/s`);
+                }
+                lastTimeRef.current = now;
+                lastLoadedRef.current = event.loaded;
+              }
+            } else {
+              lastTimeRef.current = now;
+              lastLoadedRef.current = event.loaded;
+            }
           }
         };
 
@@ -359,7 +387,12 @@ const UploadCard = ({ onSuccess }: UploadCardProps) => {
 
       {loading && (
         <Progress value={progress} className="w-full">
-          <ProgressValue />
+          <ProgressValue className="ml-0 text-xs" />
+          {speed && (
+            <span className="ml-auto text-xs font-mono text-muted-foreground select-none">
+              {speed}
+            </span>
+          )}
         </Progress>
       )}
 
