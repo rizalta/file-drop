@@ -12,6 +12,7 @@ import {
 } from "./ui/select";
 import { getFileIcon } from "../lib/file-icon";
 import { toast } from "./ui/toast";
+import { Progress, ProgressValue } from "./ui/progress";
 
 interface UploadCardProps {
   onSuccess?: (id: string) => void;
@@ -27,6 +28,7 @@ const UploadCard = ({ onSuccess }: UploadCardProps) => {
   const [customExpiresIn, setCustomExpiresIn] = useState("");
   const [content, setContent] = useState("");
   const [loading, setLoading] = useState(false);
+  const [progress, setProgress] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
 
   useEffect(() => {
@@ -73,22 +75,6 @@ const UploadCard = ({ onSuccess }: UploadCardProps) => {
   const handleUpload = async (e: React.SubmitEvent) => {
     e.preventDefault();
 
-    const xhr = new XMLHttpRequest()
-    xhr.open("POST", "/api/upload")
-
-    xhr.onprogress = (e) => {
-      const progress = Math.floor(e.loaded / e.total * 100)
-
-      console.log(progress)
-    }
-
-    xhr.onload = () => {
-      if (xhr.status >= 200 && xhr.status <= 300) {
-        console.log(100)
-      }
-    }
-
-
     if (activeTab === "file" && !file) {
       toast.add({
         title: "File Required",
@@ -115,6 +101,7 @@ const UploadCard = ({ onSuccess }: UploadCardProps) => {
     }
 
     setLoading(true);
+    setProgress(0);
 
     const formData = new FormData();
     const finalExpiresIn = isCustomExpiry ? customExpiresIn.trim() : expiresIn;
@@ -129,21 +116,39 @@ const UploadCard = ({ onSuccess }: UploadCardProps) => {
     }
 
     try {
-      const res = await fetch("/api/upload", {
-        method: "POST",
-        body: formData,
+      const data = await new Promise<{ id: string }>((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+
+        xhr.upload.onprogress = (event) => {
+          if (event.lengthComputable && event.total > 0) {
+            const pct = Math.round((event.loaded / event.total) * 100);
+            setProgress(pct);
+          }
+        };
+
+        xhr.onload = () => {
+          if (xhr.status >= 200 && xhr.status < 300) {
+            try {
+              const resData = JSON.parse(xhr.responseText);
+              resolve(resData);
+            } catch {
+              reject(new Error("Invalid response from server."));
+            }
+          } else {
+            try {
+              const errData = JSON.parse(xhr.responseText);
+              reject(new Error(errData.error || `Upload failed (${xhr.status})`));
+            } catch {
+              reject(new Error(`Upload failed (${xhr.status})`));
+            }
+          }
+        };
+
+        xhr.onerror = () => reject(new Error("Something went wrong. Please check connection."));
+
+        xhr.open("POST", "/api/upload");
+        xhr.send(formData);
       });
-
-      const data = await res.json();
-
-      if (!res.ok) {
-        toast.add({
-          title: "Upload Failed",
-          description: data.error || "Failed to create drop.",
-          type: "error",
-        });
-        return;
-      }
 
       toast.add({
         title: "Filedrop Created",
@@ -151,10 +156,10 @@ const UploadCard = ({ onSuccess }: UploadCardProps) => {
         type: "success",
       });
       onSuccess?.(data.id);
-    } catch (err) {
+    } catch (err: any) {
       toast.add({
-        title: "Network Error",
-        description: "Something went wrong. Please check connection.",
+        title: "Upload Error",
+        description: err.message || "Failed to create drop.",
         type: "error",
       });
     } finally {
@@ -326,6 +331,12 @@ const UploadCard = ({ onSuccess }: UploadCardProps) => {
           </label>
         </div>
       </div>
+
+      {loading && (
+        <Progress value={progress} className="w-full">
+          <ProgressValue />
+        </Progress>
+      )}
 
       <Button
         type="submit"
