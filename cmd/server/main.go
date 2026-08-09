@@ -22,7 +22,10 @@ import (
 
 func main() {
 	ctx := context.Background()
-	config := config.Load()
+	config, err := config.Load()
+	if err != nil {
+		log.Fatalf("failed to get config: %v", err)
+	}
 
 	dsn := fmt.Sprintf("postgres://%s:%s@%s:%s/%s?sslmode=disable",
 		config.DBUser,
@@ -75,8 +78,9 @@ func main() {
 
 	service := service.NewService(querier, storage)
 
-	handler := handler.NewHandler(service)
+	handler := handler.NewHandler(service, config.MaxUploadSize)
 
+	r.Get("/api/config", handler.Config)
 	r.Post("/api/upload", handler.UploadDrop)
 	r.Get("/api/f/{id}", handler.GetDrop)
 	r.Delete("/api/f/{id}", handler.DeleteDrop)

@@ -17,6 +17,8 @@ import (
 	"github.com/rizalta/file-drop/internal/service"
 )
 
+const maxMemory = 32
+
 type DropsService interface {
 	CleanupExpiredDrops(ctx context.Context) error
 	CreateDrop(ctx context.Context, params service.CreateDropParams) (string, error)
@@ -26,19 +28,34 @@ type DropsService interface {
 }
 
 type handler struct {
-	dropsService DropsService
+	dropsService  DropsService
+	maxUploadSize int64
 }
 
-func NewHandler(s DropsService) *handler {
-	return &handler{s}
+func NewHandler(s DropsService, m int64) *handler {
+	return &handler{s, m}
 }
 
 type UploadDropRes struct {
 	ID string `json:"id"`
 }
 
+func (h *handler) Config(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	if err := json.NewEncoder(w).Encode(map[string]int64{
+		"max_upload_size": h.maxUploadSize << 20,
+	}); err != nil {
+		errResponse(w, "Something went wrong", http.StatusInternalServerError)
+	}
+}
+
 func (h *handler) UploadDrop(w http.ResponseWriter, r *http.Request) {
+	r.Body = http.MaxBytesReader(w, r.Body, h.maxUploadSize<<20)
 	if err := r.ParseMultipartForm(32 << 20); err != nil {
+		if _, ok := errors.AsType[*http.MaxBytesError](err); ok {
+			errResponse(w, fmt.Sprintf("File size exceeds max upload size (%d MB)", h.maxUploadSize), http.StatusRequestEntityTooLarge)
+			return
+		}
 		errResponse(w, "Failed to parse form", http.StatusBadRequest)
 		return
 	}

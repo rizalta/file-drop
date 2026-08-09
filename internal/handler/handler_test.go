@@ -101,7 +101,7 @@ func TestUploadDrop(t *testing.T) {
 		rec := httptest.NewRecorder()
 
 		m := newMockService()
-		h := NewHandler(m)
+		h := NewHandler(m, 100)
 
 		h.UploadDrop(rec, req)
 
@@ -132,7 +132,7 @@ func TestUploadDrop(t *testing.T) {
 		rec := httptest.NewRecorder()
 
 		m := newMockService()
-		h := NewHandler(m)
+		h := NewHandler(m, 100)
 
 		h.UploadDrop(rec, req)
 
@@ -166,12 +166,34 @@ func TestUploadDrop(t *testing.T) {
 		rec := httptest.NewRecorder()
 
 		m := newMockService()
-		h := NewHandler(m)
+		h := NewHandler(m, 100)
 
 		h.UploadDrop(rec, req)
 
 		if rec.Code != 400 {
 			t.Errorf("expected status 400 but got %d", rec.Code)
+		}
+	})
+
+	t.Run("upload exceeding max limit returns 413", func(t *testing.T) {
+		body := &bytes.Buffer{}
+		mw := multipart.NewWriter(body)
+
+		filepart, _ := mw.CreateFormFile("file", "large.txt")
+		_, _ = filepart.Write(bytes.Repeat([]byte("a"), 2*1024*1024))
+		_ = mw.Close()
+
+		req := httptest.NewRequest("POST", "/api/upload", body)
+		req.Header.Set("Content-Type", mw.FormDataContentType())
+		rec := httptest.NewRecorder()
+
+		m := newMockService()
+		h := NewHandler(m, 1)
+
+		h.UploadDrop(rec, req)
+
+		if rec.Code != 413 {
+			t.Errorf("expected status 413 but got %d", rec.Code)
 		}
 	})
 }
@@ -181,7 +203,7 @@ func TestDownloadDrop(t *testing.T) {
 
 	t.Run("download raw file stream", func(t *testing.T) {
 		m := newMockService()
-		h := NewHandler(m)
+		h := NewHandler(m, 100)
 
 		fileContent := "binary file payload data"
 		_, _ = m.CreateDrop(ctx, service.CreateDropParams{
@@ -214,7 +236,7 @@ func TestDownloadDrop(t *testing.T) {
 
 	t.Run("download JSON preview", func(t *testing.T) {
 		m := newMockService()
-		h := NewHandler(m)
+		h := NewHandler(m, 100)
 
 		_, _ = m.CreateDrop(ctx, service.CreateDropParams{
 			Filename: "file.txt",
@@ -247,7 +269,7 @@ func TestDownloadDrop(t *testing.T) {
 
 	t.Run("non existent drop returns 404", func(t *testing.T) {
 		m := newMockService()
-		h := NewHandler(m)
+		h := NewHandler(m, 100)
 
 		req := httptest.NewRequest("GET", "/f/missing", nil)
 		rctx := chi.NewRouteContext()
@@ -268,7 +290,7 @@ func TestDeleteDrop(t *testing.T) {
 
 	t.Run("successful drop deletion", func(t *testing.T) {
 		m := newMockService()
-		h := NewHandler(m)
+		h := NewHandler(m, 100)
 
 		_, _ = m.CreateDrop(ctx, service.CreateDropParams{
 			Filename: "file.txt",
@@ -295,7 +317,7 @@ func TestDeleteDrop(t *testing.T) {
 
 	t.Run("deleting non existent drop returns 404", func(t *testing.T) {
 		m := newMockService()
-		h := NewHandler(m)
+		h := NewHandler(m, 100)
 
 		req := httptest.NewRequest("DELETE", "/api/v1/files/missing", nil)
 		rctx := chi.NewRouteContext()
@@ -307,6 +329,34 @@ func TestDeleteDrop(t *testing.T) {
 
 		if rec.Code != 404 {
 			t.Errorf("expected status 404, got %d", rec.Code)
+		}
+	})
+}
+
+func TestConfig(t *testing.T) {
+	t.Run("returns max upload size configuration", func(t *testing.T) {
+		m := newMockService()
+		h := NewHandler(m, 50)
+
+		req := httptest.NewRequest("GET", "/api/config", nil)
+		rec := httptest.NewRecorder()
+
+		h.Config(rec, req)
+
+		if rec.Code != 200 {
+			t.Errorf("expected status 200, got %d", rec.Code)
+		}
+
+		var res struct {
+			MaxUploadSize int64 `json:"max_upload_size"`
+		}
+		if err := json.Unmarshal(rec.Body.Bytes(), &res); err != nil {
+			t.Fatalf("failed to unmarshal response: %v", err)
+		}
+
+		expected := int64(50 << 20)
+		if res.MaxUploadSize != expected {
+			t.Errorf("expected max_upload_size %d, got %d", expected, res.MaxUploadSize)
 		}
 	})
 }
