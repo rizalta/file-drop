@@ -9,11 +9,12 @@ import (
 	"time"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/go-chi/chi/v5/middleware"
+	chimiddleware "github.com/go-chi/chi/v5/middleware"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/rizalta/file-drop/db"
 	"github.com/rizalta/file-drop/internal/config"
 	"github.com/rizalta/file-drop/internal/handler"
+	"github.com/rizalta/file-drop/internal/middleware"
 	"github.com/rizalta/file-drop/internal/repo"
 	"github.com/rizalta/file-drop/internal/service"
 	"github.com/rizalta/file-drop/internal/storage"
@@ -50,7 +51,7 @@ func main() {
 		log.Fatalf("failed to initialize static handler")
 	}
 
-	r.Use(middleware.Logger)
+	r.Use(chimiddleware.Logger)
 
 	r.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
@@ -81,7 +82,7 @@ func main() {
 	handler := handler.NewHandler(service, config.MaxUploadSize)
 
 	r.Get("/api/config", handler.Config)
-	r.Post("/api/upload", handler.UploadDrop)
+	r.With(middleware.UploadRateLimiter(config.RateLimitUploads)).Post("/api/upload", handler.UploadDrop)
 	r.Get("/api/f/{id}", handler.GetDrop)
 	r.Delete("/api/f/{id}", handler.DeleteDrop)
 
