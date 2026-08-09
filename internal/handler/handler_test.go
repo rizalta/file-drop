@@ -82,8 +82,6 @@ func (m *mockService) GetDrop(ctx context.Context, id string, isDownload bool) (
 	return drop, rc, nil
 }
 
-func (m *mockService) ListActiveDrops(ctx context.Context) ([]repo.Drop, error) { return nil, nil }
-
 func TestUploadDrop(t *testing.T) {
 	t.Run("successful file upload", func(t *testing.T) {
 		body := &bytes.Buffer{}

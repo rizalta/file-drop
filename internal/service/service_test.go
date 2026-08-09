@@ -81,17 +81,6 @@ func (mq *mockQuerier) GetDropByID(ctx context.Context, id string) (repo.Drop, e
 	return *drop, nil
 }
 
-func (mq *mockQuerier) ListActiveDrops(ctx context.Context) ([]repo.Drop, error) {
-	var list []repo.Drop
-	now := time.Now().UTC()
-	for _, drop := range mq.drops {
-		if drop.ExpiresAt.After(now) {
-			list = append(list, *drop)
-		}
-	}
-	return list, nil
-}
-
 func (mq *mockQuerier) IncrementDownloadCount(ctx context.Context, id string) error {
 	drop, ok := mq.drops[id]
 	if !ok {
@@ -293,32 +282,6 @@ func TestGetDrop(t *testing.T) {
 
 		if len(mq.drops) != 0 {
 			t.Errorf("expected 0 drops in DB mock after burn-after-download, found %d", len(mq.drops))
-		}
-	})
-}
-
-func TestListActiveDrops(t *testing.T) {
-	ctx := context.Background()
-
-	t.Run("list returns active drops", func(t *testing.T) {
-		ms := newMockStorage()
-		mq := newMockQuerier()
-		s := NewService(mq, ms)
-
-		_, _ = s.CreateDrop(ctx, CreateDropParams{
-			Filename:  "file1.txt",
-			FileSize:  5,
-			ExpiresIn: "1h",
-			Reader:    bytes.NewBufferString("file1"),
-		})
-
-		drops, err := s.ListActiveDrops(ctx)
-		if err != nil {
-			t.Fatalf("expected no error, got %v", err)
-		}
-
-		if len(drops) != 1 {
-			t.Errorf("expected 1 active drop, got %d", len(drops))
 		}
 	})
 }

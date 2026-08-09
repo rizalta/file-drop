@@ -42,7 +42,6 @@ type Querier interface {
 	DeleteExpiredDrops(ctx context.Context) ([]repo.DeleteExpiredDropsRow, error)
 	GetDropByID(ctx context.Context, id string) (repo.Drop, error)
 	IncrementDownloadCount(ctx context.Context, id string) error
-	ListActiveDrops(ctx context.Context) ([]repo.Drop, error)
 }
 
 type service struct {
@@ -148,10 +147,6 @@ func (s *service) GetDrop(ctx context.Context, id string, isDownload bool) (*rep
 	}
 
 	return &drop, rc, nil
-}
-
-func (s *service) ListActiveDrops(ctx context.Context) ([]repo.Drop, error) {
-	return s.queries.ListActiveDrops(ctx)
 }
 
 func (s *service) DeleteDrop(ctx context.Context, id string) error {

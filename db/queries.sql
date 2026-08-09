@@ -27,11 +27,6 @@ SELECT * FROM drops
 WHERE id = $1 AND expires_at > NOW()
 LIMIT 1;
 
--- name: ListActiveDrops :many
-SELECT * FROM drops
-WHERE expires_at > NOW()
-ORDER BY created_at DESC;
-
 -- name: IncrementDownloadCount :exec
 UPDATE drops
 SET download_count = download_count + 1

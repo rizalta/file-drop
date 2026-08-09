@@ -24,7 +24,6 @@ type DropsService interface {
 	CreateDrop(ctx context.Context, params service.CreateDropParams) (string, error)
 	DeleteDrop(ctx context.Context, id string) error
 	GetDrop(ctx context.Context, id string, isDownload bool) (*repo.Drop, io.ReadCloser, error)
-	ListActiveDrops(ctx context.Context) ([]repo.Drop, error)
 }
 
 type handler struct {
