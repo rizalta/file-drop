@@ -9,7 +9,11 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-postgres} -d ${DB_NAME:-file_drop}"]
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U ${DB_USER:-postgres} -d ${DB_NAME:-file_drop}",
+        ]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -29,13 +33,19 @@ services:
       DB_PASSWORD: ${DB_PASSWORD:-postgres}
       DB_NAME: ${DB_NAME:-file_drop}
       STORAGE_PATH: /data/blobs
+      MAX_UPLOAD_SIZE: ${MAX_UPLOAD_SIZE:-100}
+      RATE_LIMIT_UPLOADS: ${RATE_LIMIT_UPLOADS:-10}
     volumes:
       - blobs_data:/data/blobs
     depends_on:
       postgres:
         condition: service_healthy
     healthcheck:
-      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:8000/healthz || exit 1"]
+      test:
+        [
+          "CMD-SHELL",
+          "wget --no-verbose --tries=1 --spider http://localhost:8000/healthz || exit 1",
+        ]
       interval: 10s
       timeout: 5s
       retries: 3
