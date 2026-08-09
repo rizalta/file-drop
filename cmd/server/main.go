@@ -52,6 +52,7 @@ func main() {
 	}
 
 	r.Use(chimiddleware.Logger)
+	r.Use(middleware.SecurityHeader)
 
 	r.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
