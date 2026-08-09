@@ -6,6 +6,9 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"os"
+	"os/signal"
+	"syscall"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -22,7 +25,9 @@ import (
 )
 
 func main() {
-	ctx := context.Background()
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+
 	config, err := config.Load()
 	if err != nil {
 		log.Fatalf("failed to get config: %v", err)
@@ -93,15 +98,40 @@ func main() {
 		ticker := time.NewTicker(1 * time.Minute)
 		defer ticker.Stop()
 
-		for range ticker.C {
-			if err := service.CleanupExpiredDrops(ctx); err != nil {
-				log.Printf("failed to cleanup drops: %v", err)
+		for {
+			select {
+			case <-ticker.C:
+				if err := service.CleanupExpiredDrops(ctx); err != nil {
+					log.Printf("failed to cleanup drops: %v", err)
+				}
+			case <-ctx.Done():
+				return
 			}
 		}
 	}()
 
-	fmt.Printf("Server is running on port: %s\n", config.ServerPort)
-	if err := http.ListenAndServe(":"+config.ServerPort, r); err != nil {
-		log.Fatalf("failed to Listen to %s: %v", config.ServerPort, err)
+	srv := http.Server{
+		Addr:    ":" + config.ServerPort,
+		Handler: r,
 	}
+
+	go func() {
+		fmt.Printf("Server is running on port: %s\n", config.ServerPort)
+		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			log.Fatalf("failed to Listen to %s: %v", config.ServerPort, err)
+		}
+	}()
+
+	<-ctx.Done()
+	log.Println("Shutting down server gracefully...")
+
+	shutDownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	if err := srv.Shutdown(shutDownCtx); err != nil {
+		log.Println("failed to shut down gracefully")
+	}
+
+	pool.Close()
+	log.Println("Shutdown complete")
 }
